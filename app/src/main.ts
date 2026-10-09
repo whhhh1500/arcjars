@@ -263,7 +263,10 @@ async function loadPay(jar: Address) {
     try {
       if (!net.factory) throw new Error("no factory");
       const impl = await pub.readContract({ address: net.factory, abi: factoryAbi, functionName: "implementation" });
-      pay.verify = code.toLowerCase() === cloneCode(impl) ? "verified" : "unverified";
+      const matches = code.toLowerCase() === cloneCode(impl);
+      // Only vouch for jars of the official (build-time) factory read through the default RPC:
+      // a link that swaps in its own factory or RPC could otherwise "verify" anything.
+      pay.verify = !matches ? "unverified" : factoryOverridden || rpcOverridden ? "unknown" : "verified";
     } catch {
       pay.verify = "unknown";
     }
