@@ -2,6 +2,13 @@
 pragma solidity ^0.8.28;
 
 import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+
+/// @dev Callback into the factory so its owner -> jars registry follows ownership changes.
+interface IArcJarRegistry {
+    function recordOwnerChange(address previousOwner, address newOwner) external;
+}
 
 /// @title ArcJar — non-custodial income jars for USDC on Arc
 /// @author ArcJars
@@ -24,6 +31,8 @@ import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/Reentrancy
 ///         Deployed as EIP-1167 clones by {ArcJarFactory}; `feeRecipient` and
 ///         `feeBps` are immutables of the implementation, shared by every clone.
 contract ArcJar is ReentrancyGuardTransient {
+    using SafeERC20 for IERC20;
+
     // ------------------------------------------------------------------ constants
 
     /// @notice Hard ceiling on the protocol fee: 0.2 %. Cannot be raised, ever.
@@ -35,6 +44,8 @@ contract ArcJar is ReentrancyGuardTransient {
     uint256 public constant MAX_JARS = 8;
     /// @notice Locks can be set at most this far in the future (fat-finger guard).
     uint64 public constant MAX_LOCK = 3650 days;
+    /// @notice Arc's ERC-20 interface onto the native USDC balance. Never rescuable.
+    address public constant USDC_ERC20 = 0x3600000000000000000000000000000000000000;
 
     // ----------------------------------------------------------------- immutables
 
@@ -59,6 +70,10 @@ contract ArcJar is ReentrancyGuardTransient {
     // ---------------------------------------------------------------------- state
 
     address public owner;
+    /// @notice Proposed new owner; must call {acceptOwnership} (two-step transfer).
+    address public pendingOwner;
+    /// @notice The factory that created this jar (receives ownership-change callbacks).
+    address public factory;
     /// @notice Sum of all jar balances plus accrued fees. Anything above this is unallocated.
     uint256 public allocated;
     /// @notice Protocol fees accrued and not yet sent to `feeRecipient`.
@@ -78,7 +93,9 @@ contract ArcJar is ReentrancyGuardTransient {
     event DestUpdated(uint256 indexed jarId, address dest);
     event Withdrawn(uint256 indexed jarId, address indexed to, uint256 amount);
     event FeesCollected(address indexed to, uint256 amount);
+    event OwnershipTransferStarted(address indexed previousOwner, address indexed newOwner);
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
+    event TokenRescued(address indexed token, address indexed to, uint256 amount);
 
     // --------------------------------------------------------------------- errors
 
@@ -96,6 +113,10 @@ contract ArcJar is ReentrancyGuardTransient {
     error InsufficientJarBalance();
     error NothingToSweep();
     error TransferFailed();
+    error NotPendingOwner();
+    error ProtectedToken();
+    error NativeBalanceMoved();
+    error BadDest();
 
     // ------------------------------------------------------------------ modifiers
 
@@ -124,6 +145,7 @@ contract ArcJar is ReentrancyGuardTransient {
         if (owner != address(0)) revert AlreadyInitialized();
         if (owner_ == address(0)) revert ZeroAddress();
         owner = owner_;
+        factory = msg.sender;
         _jars.push(Jar({balance: 0, bps: 0, unlockAt: 0}));
         _names.push("Spendable");
         _dests.push(address(0));
@@ -207,14 +229,44 @@ contract ArcJar is ReentrancyGuardTransient {
     /// @notice Set (or clear with address(0)) a fixed payout address for a jar.
     function setDest(uint256 jarId, address dest) external onlyOwner {
         if (jarId >= _jars.length) revert BadJar();
+        if (dest == address(this)) revert BadDest();
         _dests[jarId] = dest;
         emit DestUpdated(jarId, dest);
     }
 
+    /// @notice Step 1 of 2: propose a new owner. Pass address(0) to cancel a pending transfer.
+    ///         Nothing changes until `newOwner` calls {acceptOwnership}, so a typo can't
+    ///         hand a (possibly time-locked) jar to an address nobody controls.
     function transferOwnership(address newOwner) external onlyOwner {
-        if (newOwner == address(0)) revert ZeroAddress();
-        emit OwnershipTransferred(owner, newOwner);
+        pendingOwner = newOwner;
+        emit OwnershipTransferStarted(owner, newOwner);
+    }
+
+    /// @notice Step 2 of 2: the proposed owner takes over. Locks and balances are unchanged.
+    function acceptOwnership() external {
+        address newOwner = pendingOwner;
+        if (msg.sender != newOwner) revert NotPendingOwner();
+        address previous = owner;
         owner = newOwner;
+        pendingOwner = address(0);
+        emit OwnershipTransferred(previous, newOwner);
+        IArcJarRegistry(factory).recordOwnerChange(previous, newOwner);
+    }
+
+    /// @notice Return a token that is *not* USDC (EURC, cirBTC, WETH, ...) sent here by mistake.
+    ///         Those tokens are never split and would otherwise be stuck forever.
+    /// @dev    USDC can never leave through this path: the ERC-20 interface is rejected by
+    ///         address, and as a chain-agnostic backstop the call reverts if the jar's native
+    ///         balance went down, so any token that is a view of the native balance cannot be
+    ///         used to bypass jar accounting or time locks.
+    function rescueToken(address token, address to, uint256 amount) external onlyOwner nonReentrant {
+        if (token == USDC_ERC20 || token == address(0)) revert ProtectedToken();
+        if (token.code.length == 0) revert ProtectedToken();
+        if (to == address(0) || to == address(this)) revert ZeroAddress();
+        uint256 nativeBefore = address(this).balance;
+        IERC20(token).safeTransfer(to, amount);
+        if (address(this).balance < nativeBefore) revert NativeBalanceMoved();
+        emit TokenRescued(token, to, amount);
     }
 
     // ----------------------------------------------------------------- protocol
@@ -322,6 +374,7 @@ contract ArcJar is ReentrancyGuardTransient {
             total += _jars[i].bps;
         }
         if (total > BPS) revert BpsOverflow();
+        if (c.dest == address(this)) revert BadDest();
         _jars.push(Jar({balance: 0, bps: c.bps, unlockAt: c.unlockAt}));
         _names.push(c.name);
         _dests.push(c.dest);

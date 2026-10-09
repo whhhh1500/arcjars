@@ -12,8 +12,13 @@ contract ArcJarFactory {
 
     /// @notice All jars ever created by an owner (UI convenience).
     mapping(address owner => address[]) internal _jarsOf;
+    /// @notice True for every jar this factory deployed.
+    mapping(address jar => bool) public isJar;
 
     event JarCreated(address indexed owner, address indexed jar, bytes32 salt);
+    event JarOwnerChanged(address indexed jar, address indexed previousOwner, address indexed newOwner);
+
+    error NotAJar();
 
     constructor(address feeRecipient, uint16 feeBps) {
         implementation = new ArcJar(feeRecipient, feeBps);
@@ -22,9 +27,19 @@ contract ArcJarFactory {
     /// @notice Create a jar owned by the caller.
     function createJar(bytes32 salt, ArcJar.JarConfig[] calldata configs) external returns (address jar) {
         jar = Clones.cloneDeterministic(address(implementation), _salt(msg.sender, salt));
+        isJar[jar] = true;
         ArcJar(payable(jar)).initialize(msg.sender, configs);
         _jarsOf[msg.sender].push(jar);
         emit JarCreated(msg.sender, jar, salt);
+    }
+
+    /// @notice Called by a jar when its two-step ownership transfer completes, so the new
+    ///         owner finds the jar via {jarsOf}. The previous owner's list keeps the entry
+    ///         (append-only); clients should filter on `ArcJar.owner()`.
+    function recordOwnerChange(address previousOwner, address newOwner) external {
+        if (!isJar[msg.sender]) revert NotAJar();
+        _jarsOf[newOwner].push(msg.sender);
+        emit JarOwnerChanged(msg.sender, previousOwner, newOwner);
     }
 
     function predictJar(address owner, bytes32 salt) external view returns (address) {

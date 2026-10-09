@@ -39,6 +39,57 @@ contract RejectingReceiver {
     }
 }
 
+contract MockToken {
+    mapping(address => uint256) public balanceOf;
+
+    function mint(address to, uint256 a) external {
+        balanceOf[to] += a;
+    }
+
+    function transfer(address to, uint256 a) external returns (bool) {
+        balanceOf[msg.sender] -= a;
+        balanceOf[to] += a;
+        return true;
+    }
+}
+
+/// @dev Mimics Arc's USDC ERC-20 interface: `transfer` moves the caller's *native* balance.
+contract NativeViewToken is Test {
+    function transfer(address to, uint256 a) external returns (bool) {
+        uint256 native = a * 1e12;
+        vm.deal(msg.sender, msg.sender.balance - native);
+        vm.deal(to, to.balance + native);
+        return true;
+    }
+}
+
+/// @dev Forces native value into a jar without running its code (EIP-6780 same-tx selfdestruct).
+contract ForceSender {
+    constructor(address payable to) payable {
+        selfdestruct(to);
+    }
+}
+
+/// @dev Owner contract that pays 10 USDC back into the jar while receiving a payout.
+contract PayBack {
+    bool internal busy;
+
+    function createJar(ArcJarFactory f, ArcJar.JarConfig[] calldata cfg) external returns (address) {
+        return f.createJar(bytes32("pb"), cfg);
+    }
+
+    function withdrawAll(ArcJar jar) external {
+        jar.withdraw(0, type(uint256).max, address(this));
+    }
+
+    receive() external payable {
+        if (busy) return;
+        busy = true;
+        (bool ok,) = msg.sender.call{value: 10e18}("");
+        require(ok, "payback failed");
+    }
+}
+
 contract ArcJarTest is Test {
     ArcJarFactory factory;
     ArcJar jar;
@@ -425,20 +476,122 @@ contract ArcJarTest is Test {
         vm.stopPrank();
     }
 
-    function test_TransferOwnership() public {
+    function test_TransferOwnershipIsTwoStep() public {
         address bob = makeAddr("bob");
         vm.prank(alice);
         jar.transferOwnership(bob);
+        // nothing changes until bob accepts
+        assertEq(jar.owner(), alice);
+        assertEq(jar.pendingOwner(), bob);
+        vm.prank(payer);
+        vm.expectRevert(ArcJar.NotPendingOwner.selector);
+        jar.acceptOwnership();
+
+        vm.expectEmit(address(factory));
+        emit ArcJarFactory.JarOwnerChanged(address(jar), alice, bob);
+        vm.prank(bob);
+        jar.acceptOwnership();
         assertEq(jar.owner(), bob);
+        assertEq(jar.pendingOwner(), address(0));
+        // the factory registry follows the jar to its new owner
+        address[] memory bobs = factory.jarsOf(bob);
+        assertEq(bobs.length, 1);
+        assertEq(bobs[0], address(jar));
+
         _pay(1 * USDC);
         vm.prank(alice);
         vm.expectRevert(ArcJar.NotOwner.selector);
         jar.withdraw(0, 1, alice);
         vm.prank(bob);
         jar.withdraw(0, 1, bob);
+    }
+
+    function test_TransferOwnershipCancel() public {
+        address bob = makeAddr("bob");
+        vm.startPrank(alice);
+        jar.transferOwnership(bob);
+        jar.transferOwnership(address(0)); // cancel
+        vm.stopPrank();
         vm.prank(bob);
-        vm.expectRevert(ArcJar.ZeroAddress.selector);
-        jar.transferOwnership(address(0));
+        vm.expectRevert(ArcJar.NotPendingOwner.selector);
+        jar.acceptOwnership();
+        assertEq(jar.owner(), alice);
+    }
+
+    function test_OwnershipTransferKeepsLocks() public {
+        address bob = makeAddr("bob");
+        _pay(100 * USDC);
+        vm.prank(alice);
+        jar.transferOwnership(bob);
+        vm.prank(bob);
+        jar.acceptOwnership();
+        vm.prank(bob);
+        vm.expectRevert(abi.encodeWithSelector(ArcJar.Locked.selector, taxDay));
+        jar.withdraw(1, 1, bob);
+    }
+
+    function test_RegistryRejectsNonJars() public {
+        vm.expectRevert(ArcJarFactory.NotAJar.selector);
+        factory.recordOwnerChange(alice, payer);
+        assertTrue(factory.isJar(address(jar)));
+        assertFalse(factory.isJar(alice));
+    }
+
+    function test_ImplementationCannotAcceptOwnership() public {
+        ArcJar impl = factory.implementation();
+        vm.expectRevert(ArcJar.NotPendingOwner.selector);
+        impl.acceptOwnership();
+    }
+
+    // ------------------------------------------------------------ rescue (non-USDC tokens)
+
+    function test_RescueForeignToken() public {
+        MockToken eurc = new MockToken();
+        eurc.mint(address(jar), 50e6); // someone sent EURC to the jar by mistake
+        _pay(100 * USDC);
+        vm.prank(payer);
+        vm.expectRevert(ArcJar.NotOwner.selector);
+        jar.rescueToken(address(eurc), payer, 50e6);
+        vm.prank(alice);
+        jar.rescueToken(address(eurc), alice, 50e6);
+        assertEq(eurc.balanceOf(alice), 50e6);
+        assertEq(jar.unallocated(), 0);
+        _assertAccounting();
+    }
+
+    function test_RescueCannotTouchUsdc() public {
+        _pay(100 * USDC);
+        address usdc = jar.USDC_ERC20();
+        assertEq(usdc, 0x3600000000000000000000000000000000000000);
+        vm.startPrank(alice);
+        vm.expectRevert(ArcJar.ProtectedToken.selector);
+        jar.rescueToken(usdc, alice, 1);
+        vm.expectRevert(ArcJar.ProtectedToken.selector);
+        jar.rescueToken(address(0), alice, 1);
+        vm.expectRevert(ArcJar.ProtectedToken.selector);
+        jar.rescueToken(makeAddr("eoa"), alice, 1);
+        vm.stopPrank();
+    }
+
+    /// @dev Backstop: even a token at an unexpected address that moves the native balance
+    ///      (like USDC's ERC-20 view does on Arc) cannot be used to drain locked jars.
+    function test_RescueRevertsIfNativeBalanceMoves() public {
+        _pay(100 * USDC);
+        NativeViewToken view_ = new NativeViewToken();
+        vm.prank(alice);
+        vm.expectRevert(ArcJar.NativeBalanceMoved.selector);
+        jar.rescueToken(address(view_), alice, 24e6); // try to pull the locked Tax jar out
+        // (vm.deal inside the mock is a cheatcode and is not rolled back by the revert, so we
+        //  only assert the revert itself; on-chain the whole transfer would be undone.)
+    }
+
+    function test_RevertDestIsJarItself() public {
+        vm.startPrank(alice);
+        vm.expectRevert(ArcJar.BadDest.selector);
+        jar.setDest(1, address(jar));
+        vm.expectRevert(ArcJar.BadDest.selector);
+        jar.addJar(ArcJar.JarConfig("x", 0, 0, address(jar)));
+        vm.stopPrank();
     }
 
     // ------------------------------------------------------------ fees
@@ -484,6 +637,111 @@ contract ArcJarTest is Test {
         r.withdraw(0, 1 * USDC);
     }
 
+    // ------------------------------------------------------------ native / ERC-20 double count
+
+    /// @dev Native payments are split once in receive(); sweep() only ever sees what arrived
+    ///      without running code. Interleave both paths and check nothing is split twice.
+    function testFuzz_NoDoubleSplit(uint64[6] memory amts, uint8 pattern) public {
+        uint256 nativeTotal;
+        uint256 erc20Total;
+        for (uint256 i; i < amts.length; ++i) {
+            uint256 a = bound(amts[i], 1, 1e9) * 1e12; // ERC-20 amounts are 6-dec multiples
+            if ((pattern >> i) & 1 == 1) {
+                _pay(a);
+                nativeTotal += a;
+            } else {
+                _erc20In(a);
+                erc20Total += a;
+            }
+            assertEq(jar.unallocated(), erc20Total, "unallocated == unswept ERC-20 only");
+        }
+        if (erc20Total > 0) {
+            vm.prank(keeper);
+            assertEq(jar.sweep(), erc20Total);
+        }
+        assertEq(jar.unallocated(), 0);
+        vm.expectRevert(ArcJar.NothingToSweep.selector);
+        jar.sweep();
+        assertEq(jar.allocated(), nativeTotal + erc20Total, "every unit allocated exactly once");
+        _assertAccounting();
+    }
+
+    function test_SweepAfterSelfDestructForceSend() public {
+        vm.deal(address(this), 3 * USDC);
+        new ForceSender{value: 3 * USDC}(payable(address(jar)));
+        assertEq(jar.unallocated(), 3 * USDC);
+        jar.sweep();
+        assertEq(jar.unallocated(), 0);
+        _assertAccounting();
+    }
+
+    function test_FeeCapSameForErc20AndNative() public {
+        // 1,000 USDC via the 6-decimal ERC-20 view == 1,000e18 native: same $1 cap.
+        _erc20In(1_000e6 * 1e12);
+        jar.sweep();
+        assertEq(jar.feesAccrued(), 1 * USDC);
+        _pay(1_000 * USDC);
+        assertEq(jar.feesAccrued(), 2 * USDC);
+        // just under the cap: 499.999999 USDC (6-dec amount) -> 0.2% exactly, no cap
+        assertEq(jar.feeFor(499_999_999 * 1e12), 499_999_999 * 1e12 * 20 / 10_000);
+    }
+
+    /// @dev A payout recipient that pays back into the jar from its receive() (re-entering
+    ///      the unguarded receive path) must leave accounting exact.
+    function test_ReenterReceiveDuringWithdraw() public {
+        PayBack pb = new PayBack();
+        jar = ArcJar(payable(pb.createJar(factory, _defaultCfg())));
+        _pay(100 * USDC);
+        pb.withdrawAll(jar);
+        assertEq(address(pb).balance, 69.86e18 - 10 * USDC);
+        assertEq(jar.unallocated(), 0);
+        _assertAccounting();
+    }
+
+    function test_PaymentToImplementationReverts() public {
+        // The bare implementation has no jars; a payer's funds must bounce, not get stuck.
+        address impl = address(factory.implementation());
+        vm.prank(payer);
+        (bool ok,) = impl.call{value: 1 * USDC}("");
+        assertFalse(ok);
+        assertEq(impl.balance, 0);
+    }
+
+    function test_FrontRunCreateCannotHijackPredictedAddress() public {
+        // A pay link to a not-yet-created jar is safe: nobody else can deploy at that address.
+        address predicted = factory.predictJar(alice, bytes32("later"));
+        vm.prank(payer);
+        (bool ok,) = predicted.call{value: 5 * USDC}(""); // paid before creation
+        assertTrue(ok);
+        address mallory = makeAddr("mallory");
+        vm.prank(mallory);
+        address mj = factory.createJar(bytes32("later"), _defaultCfg());
+        assertTrue(mj != predicted);
+        address j = _create(alice, bytes32("later"), _defaultCfg());
+        assertEq(j, predicted);
+        assertEq(ArcJar(payable(j)).owner(), alice);
+        assertEq(ArcJar(payable(j)).unallocated(), 5 * USDC); // early money is sweepable
+    }
+
+    function test_GasEightJarsSweepAndViews() public {
+        ArcJar.JarConfig[] memory cfg = new ArcJar.JarConfig[](7);
+        for (uint256 i; i < 7; ++i) {
+            cfg[i] = ArcJar.JarConfig(bytes32(i), 1000, uint64(block.timestamp + 1 days), address(0));
+        }
+        uint256 g = gasleft();
+        jar = ArcJar(payable(_create(alice, bytes32("gas8"), cfg)));
+        uint256 createGas = g - gasleft();
+        _erc20In(1 * USDC);
+        g = gasleft();
+        jar.sweep();
+        uint256 sweepGas = g - gasleft();
+        emit log_named_uint("createJar gas, 8 jars", createGas);
+        emit log_named_uint("sweep gas, 8 jars", sweepGas);
+        assertLt(createGas, 700_000);
+        assertLt(sweepGas, 200_000);
+        jar.jars();
+    }
+
     // ------------------------------------------------------------ gas
 
     function test_GasReceiveFitsBudget() public {
@@ -517,26 +775,40 @@ contract Handler is Test {
         vm.deal(address(this), amount);
         (bool ok,) = address(jar).call{value: amount}("");
         require(ok);
+        ghostIn += amount;
     }
 
+    // ghost accounting for the native/ERC-20 double-count invariant
+    uint256 public ghostIn; // everything that ever entered the jar
+    uint256 public ghostOut; // everything withdrawn or collected
+    uint256 public ghostUnswept; // ERC-20 arrivals not yet swept
+
     function erc20In(uint96 amount) external {
-        vm.deal(address(jar), address(jar).balance + bound(amount, 1, 1e24));
+        uint256 a = bound(amount, 1, 1e18) * 1e12; // 6-decimal ERC-20 amounts
+        vm.deal(address(jar), address(jar).balance + a);
+        ghostIn += a;
+        ghostUnswept += a;
     }
 
     function sweep() external {
-        if (jar.unallocated() > 0) jar.sweep();
+        if (jar.unallocated() > 0) {
+            jar.sweep();
+            ghostUnswept = 0;
+        }
     }
 
     function withdraw(uint8 id, uint96 amount) external {
         id = uint8(bound(id, 0, jar.jarCount() - 1));
         (, uint256 bal,, uint64 unlockAt,) = jar.jar(id);
         if (bal == 0 || block.timestamp < unlockAt) return;
+        uint256 a = bound(amount, 1, bal);
         vm.prank(owner);
-        jar.withdraw(id, bound(amount, 1, bal), owner);
+        jar.withdraw(id, a, owner);
+        ghostOut += a;
     }
 
     function collect() external {
-        jar.collectFees();
+        ghostOut += jar.collectFees();
     }
 
     function warp(uint32 dt) external {
@@ -569,6 +841,14 @@ contract ArcJarInvariantTest is Test {
         }
         assertEq(sum + jar.feesAccrued(), jar.allocated());
         assertGe(address(jar).balance, jar.allocated());
+    }
+
+    /// @dev Native payments are split once (in receive), ERC-20 arrivals once (in sweep):
+    ///      unallocated is exactly the unswept ERC-20 total and nothing is created or lost.
+    function invariant_NoDoubleCountNoLoss() public view {
+        assertEq(jar.unallocated(), handler.ghostUnswept(), "unallocated != unswept ERC-20");
+        assertEq(address(jar).balance, handler.ghostIn() - handler.ghostOut(), "conservation");
+        assertEq(jar.allocated() + handler.ghostUnswept(), address(jar).balance);
     }
 
     function invariant_FeeNeverAboveMax() public view {
