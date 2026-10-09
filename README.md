@@ -4,6 +4,20 @@
 
 Non-custodial · no backend · no admin keys · 0.2% fee capped at $1 · EN / 中文
 
+**Live on Arc mainnet:** **[https://whhhh1500.github.io/arcjars/](https://whhhh1500.github.io/arcjars/)** · try the [verified pay page of a real mainnet jar](https://whhhh1500.github.io/arcjars/#/pay/0xbB510A19E53049a5d773dcd53DE13F3D467284c7) · [testnet evidence](#testnet-evidence-real-arc-testnet-chain-5042002)
+
+| Arc mainnet (chain 5042) | Address |
+|---|---|
+| ArcJarFactory | [`0xbf3e65533144e951ee245d04b8b53b733e92bd63`](https://explorer.arc.io/address/0xbf3e65533144e951ee245d04b8b53b733e92bd63) · [Sourcify ✓ exact match](https://repo.sourcify.dev/5042/0xbf3e65533144e951ee245d04b8b53b733e92bd63) |
+| ArcJar implementation | [`0x433188a700d393285dd55451d7a7e58e3fdada66`](https://explorer.arc.io/address/0x433188a700d393285dd55451d7a7e58e3fdada66) · [Sourcify ✓ exact match](https://repo.sourcify.dev/5042/0x433188a700d393285dd55451d7a7e58e3fdada66) |
+| Deploy tx | [`0xb09e77e9a7f3123d…`](https://explorer.arc.io/tx/0xb09e77e9a7f3123d6b286a5a2816459a3e345341284830815ce757030a908e5f) (block 25106785) |
+| Fee | 0.2% (20 bps), capped at 1 USDC, to `0xc7AC1469a8dc7E4df3CE2D646dd6D01296548CEd` |
+
+Real-funds smoke test on mainnet: jar [`0xbB510A19E53049a5d773dcd53DE13F3D467284c7`](https://explorer.arc.io/address/0xbB510A19E53049a5d773dcd53DE13F3D467284c7) (Tax 25% locked 30 days / Profit 5% / Spendable 70%) was
+[created](https://explorer.arc.io/tx/0x6f3fc21f03c868c486d2b81d129cae15a4c89e321eea9c2ac00ba3a3a522e2a2), [paid 0.5 USDC natively](https://explorer.arc.io/tx/0x29900664f94ef4c975fcb1122acc0259edaa20a645423d39879937a3ed527871) → split 0.3493 / 0.12475 / 0.02495 + 0.001 fee in the same tx,
+and the Spendable part was [withdrawn](https://explorer.arc.io/tx/0xfd698eeb3c00099eb47d146829039dff646223ca0015509c53bf0be78bfe53fc). Details: [deployments/arc-mainnet.json](deployments/arc-mainnet.json).
+A permissionless keeper (`keeper/keeper.mjs`, restart with `scripts/keeper_start.sh`) runs against mainnet every 60 s and sweeps ERC-20 / Memo payments into the jars.
+
 | 1. Share a pay link or QR | 2. The payment splits in the same transaction | 3. Set it up in one transaction |
 |---|---|---|
 | ![Pay page](docs/screenshot-pay.png) | ![Dashboard](docs/screenshot-jars-en.png) | ![Create](docs/screenshot-create.png) |

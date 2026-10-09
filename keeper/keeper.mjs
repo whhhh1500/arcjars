@@ -77,7 +77,7 @@ async function tick() {
 
 log(`keeper up: chain ${chainId}, factory ${FACTORY}, ${DRY ? "DRY RUN" : "keeper " + account.address}`);
 do {
-  try { await tick(); } catch (e) { log("tick failed:", e.shortMessage ?? e.message); }
+  try { await tick(); log(`tick ok: ${jars.size} jar(s) watched, scanned to block ${nextBlock - 1n}`); } catch (e) { log("tick failed:", e.shortMessage ?? e.message); }
   if (env.ONCE === "1") break;
   await new Promise((r) => setTimeout(r, INTERVAL));
 } while (true);
