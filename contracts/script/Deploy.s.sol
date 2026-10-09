@@ -5,12 +5,15 @@ import {Script, console2} from "forge-std/Script.sol";
 import {ArcJarFactory} from "../src/ArcJarFactory.sol";
 
 /// @notice Deploys {ArcJarFactory} (which deploys the {ArcJar} implementation).
-/// Env: FEE_RECIPIENT (required), FEE_BPS (default 20 = 0.2 %, max 20).
+/// Env: FEE_RECIPIENT (required), FEE_BPS (default 20 = 0.2 %, max 20),
+/// DEPLOYER_PK (optional: sign from env so the key never appears on a command line; else --private-key/--account).
 contract Deploy is Script {
     function run() external returns (ArcJarFactory factory) {
         address feeRecipient = vm.envAddress("FEE_RECIPIENT");
         uint16 feeBps = uint16(vm.envOr("FEE_BPS", uint256(20)));
-        vm.startBroadcast();
+        uint256 pk = vm.envOr("DEPLOYER_PK", uint256(0));
+        if (pk != 0) vm.startBroadcast(pk);
+        else vm.startBroadcast();
         factory = new ArcJarFactory(feeRecipient, feeBps);
         vm.stopBroadcast();
         console2.log("ArcJarFactory:", address(factory));

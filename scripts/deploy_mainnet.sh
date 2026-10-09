@@ -22,7 +22,10 @@ MIN_GAS_PRICE=20000000000 # Arc mempool silently drops txs with maxFeePerGas < 2
 
 CHAIN_ID=$("$CAST" chain-id --rpc-url "$RPC_URL")
 [[ "$CHAIN_ID" == "$EXPECTED_CHAIN_ID" ]] || { echo "chain id $CHAIN_ID != expected $EXPECTED_CHAIN_ID; aborting"; exit 1; }
-DEPLOYER=$("$CAST" wallet address --private-key "$DEPLOYER_PK")
+# The key stays in the environment: it is never passed on a command line (visible in ps).
+export DEPLOYER_PK
+DEPLOYER=$(python3 -c "import os; from eth_account import Account; print(Account.from_key(os.environ['DEPLOYER_PK']).address)" 2>/dev/null \
+  || "$CAST" wallet address --private-key "$DEPLOYER_PK")
 BAL=$("$CAST" balance "$DEPLOYER" --rpc-url "$RPC_URL" --ether)
 BASE=$("$CAST" base-fee --rpc-url "$RPC_URL")
 GAS_PRICE=$(python3 -c "print(max(2*int('$BASE'), $MIN_GAS_PRICE) + 1_000_000_000)")
@@ -48,7 +51,7 @@ fi
 cd contracts
 "$FORGE" build --quiet
 "$FORGE" script script/Deploy.s.sol:Deploy \
-  --rpc-url "$RPC_URL" --private-key "$DEPLOYER_PK" \
+  --rpc-url "$RPC_URL" --sender "$DEPLOYER" \
   --broadcast --slow \
   --with-gas-price "$GAS_PRICE" --priority-gas-price 1000000000 \
   "${VERIFY_ARGS[@]}"
