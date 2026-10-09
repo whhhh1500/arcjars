@@ -24,7 +24,7 @@ export const arcTestnet = defineChain({
 
 export const arcLocal = defineChain({
   ...arcTestnet,
-  name: "Arc Testnet (local fork)",
+  name: "Arc (local arc-anvil)",
   rpcUrls: { default: { http: ["http://127.0.0.1:8545"] } },
 });
 
@@ -35,11 +35,11 @@ export interface Network {
   factory: Address | "";
 }
 
-// Set the factory addresses here (or with VITE_FACTORY_ARC / VITE_FACTORY_ARC_TESTNET at build time).
+// Set the factory addresses with VITE_FACTORY_ARC / VITE_FACTORY_ARC_TESTNET (/ VITE_FACTORY_LOCAL for an arc-anvil demo) at build time.
 export const NETWORKS: Network[] = [
   { key: "arc", chain: arcMainnet, factory: (import.meta.env.VITE_FACTORY_ARC ?? "") as Address | "" },
   { key: "arc-testnet", chain: arcTestnet, factory: (import.meta.env.VITE_FACTORY_ARC_TESTNET ?? "") as Address | "" },
-  { key: "local", chain: arcLocal, factory: "" },
+  { key: "local", chain: arcLocal, factory: (import.meta.env.VITE_FACTORY_LOCAL ?? "") as Address | "" },
 ];
 
 /** URL params: ?net=arc|arc-testnet|local  &factory=0x..  &rpc=http://..  &watch=0xOwner */
