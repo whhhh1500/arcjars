@@ -14,3 +14,9 @@ keeper/node_modules/
 __pycache__/
 *.pyc
 .DS_Store
+# keys / wallets (never commit)
+*.pem
+*.key
+keystore/
+*mnemonic*
+node_modules/
