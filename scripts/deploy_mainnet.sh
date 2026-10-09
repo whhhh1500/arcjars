@@ -70,3 +70,14 @@ print(json.dumps(res, indent=2))
 print(f"\nNext: build the app with  VITE_FACTORY_ARC={res['factory']} npm --prefix app run build")
 print(f"      run the keeper with   RPC_URL={rpc} FACTORY={res['factory']} FROM_BLOCK={res['block']} KEEPER_PK=... node keeper/keeper.mjs")
 PY
+
+# Post-deploy sanity: read the immutables back from chain and refuse to continue silently if they differ.
+OUTJSON="deployments/$NAME.json"
+IMPL=$(python3 -c "import json;print(json.load(open('$OUTJSON'))['implementation'])")
+GOT_FR=$("$CAST" call "$IMPL" "feeRecipient()(address)" --rpc-url "$RPC_URL")
+GOT_BPS=$("$CAST" call "$IMPL" "feeBps()(uint16)" --rpc-url "$RPC_URL")
+GOT_OWNER=$("$CAST" call "$IMPL" "owner()(address)" --rpc-url "$RPC_URL")
+echo "on-chain check: feeRecipient $GOT_FR  feeBps $GOT_BPS  implementation owner $GOT_OWNER"
+[[ "${GOT_FR,,}" == "${FEE_RECIPIENT,,}" && "$GOT_BPS" == "$FEE_BPS" && "${GOT_OWNER,,}" == "0x000000000000000000000000000000000000dead" ]] \
+  || { echo "!! on-chain values do not match the intended config"; exit 1; }
+echo "OK"

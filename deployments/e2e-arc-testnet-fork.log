@@ -1,33 +1,47 @@
+
 == Fork mode: funding throwaway keys with anvil_setBalance (no real funds)
   owner 100.0 USDC, payer 100.0 USDC
+
 == 1. Deploy ArcJarFactory
-  factory 0xa88505f527ae3d639a6d2b377f087a58a4d92225  implementation 0x214DD9b15C47CEa1AB22690e3f53239fb3b6e707  tx 0x7a7a8c49925e2d1e4402ea11a7526c79ddc08c3dcb332883cf8fcba6fa225323
+  factory 0x2a8a9931e4b5a2b25e049b3d8af2e1a474d1dd80  implementation 0x2D3D5cD1Ba0eCfc8aADb2B6a24ecc9249effffD8  tx 0xfcb0be22488d238032b44b93471192e9311e43d436fb48c0e351be2502af023c
+
 == 2. Owner creates a jar: Tax 25% (locked 1h), Profit 5%, Spendable 70%
-  createJar: 0xe3261b346a942af4e9f8ac2cbe7c8dae2b72dc3c35267ec669a46defd4ea6e1b (status 1)
-  jar 0xC86Ba4df406A8e54e914c0F40D18B3A75881bf6B (predicted before creation)
+  createJar: 0xadfade2be72d0a6c4131a4a43685daf7c33a40cd1c8ba32ea2e9f90bfd8cb8aa (status 1)
+  jar 0x30BB939Ebc785B790a35dEfC0da43a5F30fb1aa4 (predicted before creation)
+
 == 3. Native USDC payment (wallet-estimated gas) -> split inside receive()
-  eth_estimateGas for a 10 USDC native send: 108368
-  nativePay: 0xf063749dd1626daa79c81218b338905a5de63e1d43a55d496dc2fade4cff1681 (status 1)
+  eth_estimateGas for a 10 USDC native send: 108380
+  nativePay: 0x4cd4b884819ee1d597cdd129ad14f60087871bd75df0130b174e8fd0c88d2e94 (status 1)
   jar balances [Spendable, Tax, Profit] = [6986000000000000000 [6.986e18], 2495000000000000000 [2.495e18], 499000000000000000 [4.99e17]]; unallocated 0
+
 == 4. Same balance, two interfaces: ERC-20 transfer of 4 USDC (6 decimals) -> no receive(), needs sweep
-  erc20Pay: 0xb07d917c7904483fc641984d6650675baa4dab7370c6a9a8d09abad71c52452f (status 1)
+  erc20Pay: 0xf47dee55c158634e6832b3acbe1669b91380f8203bb6f1862a5b612544802851 (status 1)
   native  10000000000000000000 -> 14000000000000000000 (+4000000000000000000 wei, 18 dp)
   erc20   10000000 -> 14000000 (6 dp)  balanceOf == native // 1e12: True
   unallocated 4000000000000000000 [4e18]
-  sweep1: 0x6fe77600269b20df9a92b0cb11883efffd91804ea28bbced9adc0894b54fccec (status 1)
+  sweep1: 0x4c56f243608a83247adf660f3d594088e9b72fe2443e13902b3e5ee83672da45 (status 1)
   after sweep: [9780400000000000000 [9.78e18], 3493000000000000000 [3.493e18], 698600000000000000 [6.986e17]]
+
 == 5. Memo-tagged invoice payment (Arc Memo contract wraps USDC.transfer)
-  memoPay: 0xa1cea38abb8b2ebfe672ade9a01ce96a3c1becceca77255ef9c9bc70b4bcdef4 (status 1)
+  memoPay: 0xd08be5ffc50e9ff5748842d2b2e479648634769081d2e0129b5de5d702e10725 (status 1)
   Memo events with memoId=keccak('INV-2026-001'): 1
-  sweep2: 0xc40361a7fdc694e776ee971b7d2b134b1bc7f818e247f424af2977aa7350b207 (status 1)
+  sweep2: 0xf0a8ea3105bc4d78db2c6fd36102d52603f5c4366554971ffa800258ed703d09 (status 1)
+
 == 6. Exchange-style plain transfer with a fixed 21000 gas limit
-  exit=0 status=0x0 tx=0xb77bdcedef63b060d426eaa81908ce6d27cc6c15837d6bffefb06e7dfff7e43d (status 0x0 = reverted out-of-gas: payer keeps the USDC, pays ~21000 gas)
+  exit=0 status=0x0 tx=0x28b0bdc8e0b83060193390386ef871f13516f5173431a9740601b571f911af2f (status 0x0 = reverted out-of-gas: payer keeps the USDC, pays ~21000 gas)
+
 == 7. Withdraw Spendable; Tax is time-locked
-  withdrawSpendable: 0x022c95ccc7c542f438e5da731b7b8e7160430fb7a3255018d7cf574787c11a70 (status 1)
+  withdrawSpendable: 0x3891e24ef1b708f62cc11632e2e9f1e2e575e4cdc374c84ffdda35333b573e83 (status 1)
   withdraw(Tax) before unlock -> reverted: Locked(unlockAt)
-  withdrawTax: 0x3a3d6d89e99f92db84e59f30379a0c37b01ffc0219d36d0c5a60c900d4026363 (status 1)
+  withdrawTax: 0x6854604e956ba6b5acb6612e48727960da5c87b87af92501e2c17d0f9104ba7d (status 1)
+
 == 8. Anyone collects protocol fees -> feeRecipient
-  collectFees: 0x3df77943fba9bdc13c7671f1f9abf8de2067f8cfe37b477c424ec90aa95631f7 (status 1)
+  collectFees: 0xd3d0f9c2c080b36f9ff04b01151d380e66e08637001f7c481647b1d093f7ccf6 (status 1)
   feeRecipient +32000000000000000 wei
   final jars: [8177600000000000000 [8.177e18], 0, 798400000000000000 [7.984e17]]; allocated 8976000000000000000 [8.976e18]; native balance 8976000000000000000
   wrote deployments/e2e-arc-testnet-fork.json
+== 9. Arc-fork checks for the review fixes (jar 0x30BB939Ebc785B790a35dEfC0da43a5F30fb1aa4)
+  rescueToken(USDC 0x3600…) by owner -> 0x093e1cdb
+  ProtectedToken() selector = 0x093e1cdb
+  after transferOwnership: owner 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266 pending 0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC
+  after acceptOwnership: owner 0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC; factory.jarsOf(newOwner) = [0x30BB939Ebc785B790a35dEfC0da43a5F30fb1aa4]

@@ -3,10 +3,11 @@
 # ERC-20 pay + Memo-tagged pay (sweep) -> 21000-gas pay -> time lock -> withdraw -> fees.
 # Usage: RPC_URL=http://127.0.0.1:8545 FORK=1 scripts/e2e.sh     (arc-anvil fork of Arc testnet)
 #        RPC_URL=https://rpc.testnet.arc.io scripts/e2e.sh        (real testnet; keys must be funded)
-# Keys come from .env.testnet (TESTNET_PK = deployer/jar owner/keeper, PAYER_PK = customer). Never printed.
+# Keys come from .env.testnet, or ENV_FILE=... (TESTNET_PK = deployer/jar owner/keeper, PAYER_PK = customer). Never printed.
+# On a fork you can use anvil dev keys: TESTNET_PK = mnemonic index 0, PAYER_PK = index 2 (index 1 is blocklisted on Arc testnet).
 set -euo pipefail
 cd "$(dirname "$0")/.."
-set -a; source .env.testnet; set +a
+set -a; source "${ENV_FILE:-.env.testnet}"; set +a
 RPC_URL=${RPC_URL:-http://127.0.0.1:8545}
 FORK=${FORK:-0}
 CAST=${CAST:-$(command -v arc-cast || command -v cast)}
