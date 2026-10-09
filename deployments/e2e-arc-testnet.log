@@ -1,0 +1,39 @@
+  owner 2.499475 USDC, payer 17.5 USDC
+
+[1m== 1. Deploy ArcJarFactory[0m
+  factory 0x9b0e9dfd78a24ff6a5e0e82c30649617f13fbbf4  implementation 0x04c9EC9aBe206fef9150682f17732030c9d54c7e  tx 0x19679d958bba881e4ab84fffaff22e98f0e42ed6318d9d553bffc6ed383daddf
+
+[1m== 2. Owner creates a jar: Tax 25% (locked 1h), Profit 5%, Spendable 70%[0m
+  createJar: 0x16fc8da7291f151eea2201871f04934f586a4bcf8f0a5edfcdcad45aa11f7dc4 (status 1)
+  jar 0x3d63b711495f8438f38a9c9A448e010addCC04b7 (predicted before creation)
+
+[1m== 3. Native USDC payment (wallet-estimated gas) -> split inside receive()[0m
+  eth_estimateGas for a 10 USDC native send: 109106
+  nativePay: 0xcc8c3e78bd643c4e9afd30d21b617f878dd680f5c378aabe7b3a13d4672a662f (status 1)
+  jar balances [Spendable, Tax, Profit] = [6986000000000000000 [6.986e18], 2495000000000000000 [2.495e18], 499000000000000000 [4.99e17]]; unallocated 32388000000000000 [3.238e16]
+
+[1m== 4. Same balance, two interfaces: ERC-20 transfer of 4 USDC (6 decimals) -> no receive(), needs sweep[0m
+  erc20Pay: 0x28b9b328d572aed04850162d53ba3839b552a2c6a3b8499a2e05a10bacb76c3a (status 1)
+  native  10032388000000000000 -> 14032388000000000000 (+4000000000000000000 wei, 18 dp)
+  erc20   10032388 -> 14032388 (6 dp)  balanceOf == native // 1e12: True
+  unallocated 4032388000000000000 [4.032e18]
+  sweep1: 0x41b778e19fef5b8e9bde8eaba870a241ad0c807a2242ea30a1347cada5cf81bf (status 1)
+  after sweep: [9803026256800000000 [9.803e18], 3501080806000000000 [3.501e18], 700216161200000000 [7.002e17]]
+
+[1m== 5. Memo-tagged invoice payment (Arc Memo contract wraps USDC.transfer)[0m
+  memoPay: 0x8bd17907c5aef2f32f04f3934150ddf5f3909eb2d19ae0287319152c6e545753 (status 1)
+  Memo events with memoId=keccak('INV-2026-001'): 1
+  sweep2: 0x38fdd5ca06b00fb41a20708c53345073ab01c770414df69d3d01be6546e7d6d4 (status 1)
+
+[1m== 6. Exchange-style plain transfer with a fixed 21000 gas limit[0m
+  exit=0 status=0x0 tx=0x9cf7938bfc2af31fce94d48202f621a148e306817478c6e0e49fd8d029b8781d (status 0x0 = reverted out-of-gas: payer keeps the USDC, pays ~21000 gas)
+
+[1m== 7. Withdraw Spendable; Tax is time-locked[0m
+  withdrawSpendable: 0xc7b0a8a086634cffd364f9fed375a4a101c656a6df24915a140f215160281a06 (status 1)
+  withdraw(Tax) before unlock -> reverted: Locked(unlockAt)
+
+[1m== 8. Anyone collects protocol fees -> feeRecipient[0m
+  collectFees: 0x3239f1d18abbd0379f0a17837952d9fe7980d66d447fbb595a853ee3ac813420 (status 1)
+  feeRecipient +32064776000000000 wei
+  final jars: [8200226256800000000 [8.2e18], 4000080806000000000 [4e18], 800016161200000000 [8e17]]; allocated 13000323224000000000 [1.3e19]; native balance 13000323224000000000
+  wrote deployments/e2e-arc-testnet.json

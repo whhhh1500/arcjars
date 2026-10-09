@@ -1,0 +1,64 @@
+{
+  "network": "arc-testnet (real, no fork)",
+  "chainId": 5042002,
+  "rpc": "https://rpc.testnet.arc.io",
+  "explorer": "https://explorer.testnet.arc.io",
+  "factory": "0x9b0e9dfd78a24ff6a5e0e82c30649617f13fbbf4",
+  "factoryUrl": "https://explorer.testnet.arc.io/address/0x9b0e9dfd78a24ff6a5e0e82c30649617f13fbbf4",
+  "implementation": "0x04c9EC9aBe206fef9150682f17732030c9d54c7e",
+  "jar": "0x3d63b711495f8438f38a9c9A448e010addCC04b7",
+  "jarUrl": "https://explorer.testnet.arc.io/address/0x3d63b711495f8438f38a9c9A448e010addCC04b7",
+  "owner": "0xFC31F3d36993eaAed5B4f6F0e9061647cEf7Af30",
+  "payer": "0x89083153b2b4C866f69cE9b4f612B27E920B6dEE",
+  "feeRecipient": "0xc7AC1469a8dc7E4df3CE2D646dd6D01296548CEd",
+  "feeBps": 20,
+  "estimateGasNativePay": 109106,
+  "fundPayerTx": "0x6199d353b5d3835c3a624d40589176cf9744b66094099cbf92785f7dd03aead1",
+  "tx": {
+    "deployFactory": {
+      "hash": "0x19679d958bba881e4ab84fffaff22e98f0e42ed6318d9d553bffc6ed383daddf",
+      "url": "https://explorer.testnet.arc.io/tx/0x19679d958bba881e4ab84fffaff22e98f0e42ed6318d9d553bffc6ed383daddf"
+    },
+    "createJar": {
+      "hash": "0x16fc8da7291f151eea2201871f04934f586a4bcf8f0a5edfcdcad45aa11f7dc4",
+      "url": "https://explorer.testnet.arc.io/tx/0x16fc8da7291f151eea2201871f04934f586a4bcf8f0a5edfcdcad45aa11f7dc4"
+    },
+    "nativePay": {
+      "hash": "0xcc8c3e78bd643c4e9afd30d21b617f878dd680f5c378aabe7b3a13d4672a662f",
+      "url": "https://explorer.testnet.arc.io/tx/0xcc8c3e78bd643c4e9afd30d21b617f878dd680f5c378aabe7b3a13d4672a662f"
+    },
+    "erc20Pay": {
+      "hash": "0x28b9b328d572aed04850162d53ba3839b552a2c6a3b8499a2e05a10bacb76c3a",
+      "url": "https://explorer.testnet.arc.io/tx/0x28b9b328d572aed04850162d53ba3839b552a2c6a3b8499a2e05a10bacb76c3a"
+    },
+    "sweep1": {
+      "hash": "0x41b778e19fef5b8e9bde8eaba870a241ad0c807a2242ea30a1347cada5cf81bf",
+      "url": "https://explorer.testnet.arc.io/tx/0x41b778e19fef5b8e9bde8eaba870a241ad0c807a2242ea30a1347cada5cf81bf"
+    },
+    "memoPay": {
+      "hash": "0x8bd17907c5aef2f32f04f3934150ddf5f3909eb2d19ae0287319152c6e545753",
+      "url": "https://explorer.testnet.arc.io/tx/0x8bd17907c5aef2f32f04f3934150ddf5f3909eb2d19ae0287319152c6e545753"
+    },
+    "sweep2": {
+      "hash": "0x38fdd5ca06b00fb41a20708c53345073ab01c770414df69d3d01be6546e7d6d4",
+      "url": "https://explorer.testnet.arc.io/tx/0x38fdd5ca06b00fb41a20708c53345073ab01c770414df69d3d01be6546e7d6d4"
+    },
+    "fixed21000Transfer": {
+      "hash": "0x9cf7938bfc2af31fce94d48202f621a148e306817478c6e0e49fd8d029b8781d",
+      "url": "https://explorer.testnet.arc.io/tx/0x9cf7938bfc2af31fce94d48202f621a148e306817478c6e0e49fd8d029b8781d"
+    },
+    "withdrawSpendable": {
+      "hash": "0xc7b0a8a086634cffd364f9fed375a4a101c656a6df24915a140f215160281a06",
+      "url": "https://explorer.testnet.arc.io/tx/0xc7b0a8a086634cffd364f9fed375a4a101c656a6df24915a140f215160281a06"
+    },
+    "collectFees": {
+      "hash": "0x3239f1d18abbd0379f0a17837952d9fe7980d66d447fbb595a853ee3ac813420",
+      "url": "https://explorer.testnet.arc.io/tx/0x3239f1d18abbd0379f0a17837952d9fe7980d66d447fbb595a853ee3ac813420"
+    }
+  },
+  "notes": [
+    "fixed21000Transfer status 0x0 is expected (reverts out-of-gas, payer keeps funds)",
+    "withdrawTax not run: real testnet has no time travel; Tax withdraw before unlock reverted Locked(unlockAt) as designed",
+    "Difference vs fork: an unrelated address 0xf2cdb72c3a8de5053c11eab94caf6630eff0870e sent 0.032388 USDC (ERC-20) to the fresh jar in block 66342010 (tx 0xe3af7fe17bf28f720dcc0b7019ddfa79549b46595182d6cd6634508d14f22196). The jar treated it as unallocated and sweep() split it with the 0.2% fee as designed; collectFees paid exactly 0.2% of 16.032388 USDC = 0.032064776. No contract change needed."
+  ]
+}

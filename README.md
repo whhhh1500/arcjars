@@ -57,6 +57,25 @@ flowchart LR
 
 ---
 
+## Testnet evidence (real Arc testnet, chain 5042002)
+
+`scripts/e2e.sh` against `https://rpc.testnet.arc.io` with no fork. Factory [`0x9b0e9dfd78a24ff6a5e0e82c30649617f13fbbf4`](https://explorer.testnet.arc.io/address/0x9b0e9dfd78a24ff6a5e0e82c30649617f13fbbf4), jar [`0x3d63b711495f8438f38a9c9A448e010addCC04b7`](https://explorer.testnet.arc.io/address/0x3d63b711495f8438f38a9c9A448e010addCC04b7). Full record: [deployments/arc-testnet.json](deployments/arc-testnet.json).
+
+| Step | Tx |
+|---|---|
+| Deploy factory + implementation | [`0x19679d95…`](https://explorer.testnet.arc.io/tx/0x19679d958bba881e4ab84fffaff22e98f0e42ed6318d9d553bffc6ed383daddf) |
+| Create jar (Tax 25% locked 1h / Profit 5% / Spendable 70%) | [`0x16fc8da7…`](https://explorer.testnet.arc.io/tx/0x16fc8da7291f151eea2201871f04934f586a4bcf8f0a5edfcdcad45aa11f7dc4) |
+| Native 10 USDC payment, split inside receive() | [`0xcc8c3e78…`](https://explorer.testnet.arc.io/tx/0xcc8c3e78bd643c4e9afd30d21b617f878dd680f5c378aabe7b3a13d4672a662f) |
+| ERC-20 transfer 4 USDC (arrives unsplit) | [`0x28b9b328…`](https://explorer.testnet.arc.io/tx/0x28b9b328d572aed04850162d53ba3839b552a2c6a3b8499a2e05a10bacb76c3a) |
+| sweep() splits it | [`0x41b778e1…`](https://explorer.testnet.arc.io/tx/0x41b778e19fef5b8e9bde8eaba870a241ad0c807a2242ea30a1347cada5cf81bf) |
+| Memo-tagged invoice payment (INV-2026-001) | [`0x8bd17907…`](https://explorer.testnet.arc.io/tx/0x8bd17907c5aef2f32f04f3934150ddf5f3909eb2d19ae0287319152c6e545753) |
+| sweep() | [`0x38fdd5ca…`](https://explorer.testnet.arc.io/tx/0x38fdd5ca06b00fb41a20708c53345073ab01c770414df69d3d01be6546e7d6d4) |
+| Exchange-style 21000-gas send → reverts OOG, payer keeps funds (expected) | [`0x9cf7938b…`](https://explorer.testnet.arc.io/tx/0x9cf7938bfc2af31fce94d48202f621a148e306817478c6e0e49fd8d029b8781d) |
+| Owner withdraws 3 USDC Spendable (Tax withdraw reverts Locked) | [`0xc7b0a8a0…`](https://explorer.testnet.arc.io/tx/0xc7b0a8a086634cffd364f9fed375a4a101c656a6df24915a140f215160281a06) |
+| collectFees() → feeRecipient gets exactly 0.2% | [`0x3239f1d1…`](https://explorer.testnet.arc.io/tx/0x3239f1d18abbd0379f0a17837952d9fe7980d66d447fbb595a853ee3ac813420) |
+
+Real-chain bonus: an unrelated address dusted the brand-new jar with 0.032388 USDC by ERC-20 seconds after creation. The jar counted it as unallocated, `sweep()` split it like any other payment, and the fee came out at exactly 0.2% of everything received.
+
 ## The problem
 
 Freelancers, creators and small shops paid in stablecoins get **one lump** of USDC and must remember to set aside tax, savings and profit by hand. Most don't, and they find out at tax time. Banks offer "envelope" or "Profit First" sub-accounts. Crypto wallets don't.
