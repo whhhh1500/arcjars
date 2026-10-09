@@ -1,0 +1,28 @@
+{
+  "network": "arc-testnet-fork (arc-anvil --network arc --fork-url https://rpc.testnet.arc.io)",
+  "chainId": 5042002,
+  "rpc": "http://127.0.0.1:8545",
+  "factory": "0xa88505f527ae3d639a6d2b377f087a58a4d92225",
+  "implementation": "0x214DD9b15C47CEa1AB22690e3f53239fb3b6e707",
+  "jar": "0xC86Ba4df406A8e54e914c0F40D18B3A75881bf6B",
+  "owner": "0xFC31F3d36993eaAed5B4f6F0e9061647cEf7Af30",
+  "payer": "0x89083153b2b4C866f69cE9b4f612B27E920B6dEE",
+  "feeRecipient": "0xc7AC1469a8dc7E4df3CE2D646dd6D01296548CEd",
+  "estimateGasNativePay": 108368,
+  "fixed21000Transfer": {
+    "status": "0x0"
+  },
+  "tx": {
+    "erc20Pay": "0xb07d917c7904483fc641984d6650675baa4dab7370c6a9a8d09abad71c52452f",
+    "collectFees": "0x3df77943fba9bdc13c7671f1f9abf8de2067f8cfe37b477c424ec90aa95631f7",
+    "sweep1": "0x6fe77600269b20df9a92b0cb11883efffd91804ea28bbced9adc0894b54fccec",
+    "sweep2": "0xc40361a7fdc694e776ee971b7d2b134b1bc7f818e247f424af2977aa7350b207",
+    "createJar": "0xe3261b346a942af4e9f8ac2cbe7c8dae2b72dc3c35267ec669a46defd4ea6e1b",
+    "withdrawSpendable": "0x022c95ccc7c542f438e5da731b7b8e7160430fb7a3255018d7cf574787c11a70",
+    "withdrawTax": "0x3a3d6d89e99f92db84e59f30379a0c37b01ffc0219d36d0c5a60c900d4026363",
+    "fixed21000Transfer": "0xb77bdcedef63b060d426eaa81908ce6d27cc6c15837d6bffefb06e7dfff7e43d",
+    "nativePay": "0xf063749dd1626daa79c81218b338905a5de63e1d43a55d496dc2fade4cff1681",
+    "deployFactory": "0x7a7a8c49925e2d1e4402ea11a7526c79ddc08c3dcb332883cf8fcba6fa225323",
+    "memoPay": "0xa1cea38abb8b2ebfe672ade9a01ce96a3c1becceca77255ef9c9bc70b4bcdef4"
+  }
+}

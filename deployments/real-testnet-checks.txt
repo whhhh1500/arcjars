@@ -1,0 +1,6 @@
+real node: arc/v1 chain 5042002
+eth_estimateGas native 1 USDC payment -> 73749
+eth_call with estimated gas -> success
+eth_call with fixed 21000 gas -> {'code': -32003, 'message': 'out of gas: gas required exceeds: 21000'}
+ERC-20 transfer to an always-reverting contract -> success (recipient code NOT executed -> sweep() needed)
+native send to the same contract -> reverts (execution reverted) -> code IS executed

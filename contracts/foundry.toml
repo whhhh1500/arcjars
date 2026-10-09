@@ -1,0 +1,20 @@
+[profile.default]
+src = "src"
+out = "out"
+libs = ["lib"]
+solc_version = "0.8.30"
+evm_version = "osaka"
+optimizer = true
+optimizer_runs = 10000
+remappings = ["@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/", "forge-std/=lib/forge-std/src/"]
+
+[fuzz]
+runs = 1000
+
+[rpc_endpoints]
+arc_testnet = "https://rpc.testnet.arc.io"
+arc = "https://rpc.mainnet.arc.io"
+
+[invariant]
+runs = 128
+depth = 64

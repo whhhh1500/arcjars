@@ -1,0 +1,16 @@
+# secrets
+.env
+.env.*
+!.env.example
+# build
+contracts/out/
+contracts/cache/
+contracts/broadcast/*/31337/
+contracts/broadcast/*/5042002/
+deployments/rehearsal-*.json
+app/node_modules/
+app/dist/
+keeper/node_modules/
+__pycache__/
+*.pyc
+.DS_Store

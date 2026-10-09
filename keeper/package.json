@@ -1,0 +1,10 @@
+{
+  "name": "arcjars-keeper",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Sweeps ERC-20 / Memo deposits into ArcJars splits and collects protocol fees.",
+  "scripts": { "start": "node keeper.mjs", "once": "ONCE=1 node keeper.mjs" },
+  "dependencies": { "viem": "^2.57.4" },
+  "license": "MIT"
+}
